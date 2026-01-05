@@ -10,13 +10,25 @@ This module contains all the core functionality for:
 Used by both the CLI (rekordbox_playlist_copier.py) and GUI (mekabox_app.py)
 """
 
-import copy
 import os
 import shutil
 import stat
 from pathlib import Path
 from urllib.parse import quote, unquote
 from xml.etree import ElementTree as ET
+
+
+def copy_element(elem):
+    """
+    Deep copy an ElementTree Element including all children and attributes.
+    Python's copy.deepcopy() doesn't work correctly with ElementTree elements.
+    """
+    new_elem = ET.Element(elem.tag, elem.attrib)
+    new_elem.text = elem.text
+    new_elem.tail = elem.tail
+    for child in elem:
+        new_elem.append(copy_element(child))
+    return new_elem
 
 
 # =============================================================================
@@ -54,6 +66,60 @@ def encode_rekordbox_path(path):
 def sanitize_filename(name):
     """Remove or replace characters that are invalid in filenames."""
     return "".join(c for c in name if c.isalnum() or c in (' ', '-', '_', '.')).strip()
+
+
+def get_unique_folder_path(base_folder, folder_name):
+    """
+    Get a unique folder path, handling case-insensitive filesystem collisions.
+
+    On macOS/Windows, 'Freeform' and 'freeform' are the same folder.
+    This function detects when a folder exists with different casing and
+    appends a suffix to make the new folder name unique.
+
+    Args:
+        base_folder: Parent directory path
+        folder_name: Desired folder name
+
+    Returns:
+        Path object for a unique folder location
+    """
+    base_path = Path(base_folder)
+    target_path = base_path / folder_name
+
+    # If the exact path doesn't exist, check for case-insensitive collision
+    if not target_path.exists():
+        # Check if any existing folder matches case-insensitively
+        try:
+            existing_folders = [f.name for f in base_path.iterdir() if f.is_dir()]
+            for existing in existing_folders:
+                if existing.lower() == folder_name.lower() and existing != folder_name:
+                    # Case collision detected - need to make unique
+                    break
+            else:
+                # No collision, use the original name
+                return target_path
+        except FileNotFoundError:
+            # Parent folder doesn't exist yet, no collision possible
+            return target_path
+
+    # Folder exists or collision detected - find a unique name
+    counter = 2
+    while True:
+        unique_name = f"{folder_name}_{counter}"
+        unique_path = base_path / unique_name
+
+        # Check both exact match and case-insensitive collision
+        if not unique_path.exists():
+            try:
+                existing_folders = [f.name.lower() for f in base_path.iterdir() if f.is_dir()]
+                if unique_name.lower() not in existing_folders:
+                    return unique_path
+            except FileNotFoundError:
+                return unique_path
+
+        counter += 1
+        if counter > 100:  # Safety limit
+            raise RuntimeError(f"Could not find unique folder name for {folder_name}")
 
 
 # =============================================================================
@@ -132,7 +198,8 @@ def get_full_track_elements(xml_file, playlist_name):
                 'track_id': key
             }
             # Deep copy the element so we can modify it without affecting the original
-            result.append((copy.deepcopy(track_elem), track_info))
+            # Note: Must use copy_element() because copy.deepcopy() doesn't preserve child elements
+            result.append((copy_element(track_elem), track_info))
 
     return result
 
@@ -434,10 +501,14 @@ def export_playlist(xml_file, playlist_name, output_base_folder, mode="full",
 
     total_tracks = len(track_elements)
 
-    # Create folder structure
-    playlist_folder = Path(output_base_folder) / safe_playlist_name
+    # Create folder structure - handle case-insensitive filesystem collisions
+    # (e.g., "Freeform" vs "freeform" on macOS)
+    playlist_folder = get_unique_folder_path(output_base_folder, safe_playlist_name)
+    # Update safe_playlist_name to match the actual folder name used
+    actual_folder_name = playlist_folder.name
+
     if mode == "full":
-        tracks_folder_name = f"{safe_playlist_name}_tracks"
+        tracks_folder_name = f"{actual_folder_name}_tracks"
         tracks_folder = playlist_folder / tracks_folder_name
         tracks_folder.mkdir(parents=True, exist_ok=True)
     else:
@@ -507,8 +578,8 @@ def export_playlist(xml_file, playlist_name, output_base_folder, mode="full",
         if progress_callback:
             progress_callback(total_tracks, total_tracks, "Generating XML...", "generating")
 
-        # Generate the playlist XML
-        xml_filename = f"{safe_playlist_name}.xml"
+        # Generate the playlist XML (use actual_folder_name for consistency with folder)
+        xml_filename = f"{actual_folder_name}.xml"
         xml_path = playlist_folder / xml_filename
         generate_playlist_xml(valid_track_elements, simple_playlist_name, tracks_folder_name, xml_path)
 

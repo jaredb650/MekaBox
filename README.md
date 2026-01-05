@@ -12,12 +12,21 @@ MekaBox exports Rekordbox playlists as shareable packages that include all your 
 Download the latest release from the [Releases page](../../releases):
 - **MekaBox-x.x.x-mac-arm64.dmg** - Disk image installer
 
-### Installation
+**Installation:**
 1. Download the DMG file
 2. Open it and drag MekaBox to your Applications folder
 3. Double-click to run
 
 > **Note:** On first launch, you may need to right-click > Open to bypass Gatekeeper.
+
+### Windows / Linux / Intel Mac
+Use the Python CLI (see [Command Line Usage](#command-line-usage) below).
+
+**Quick start:**
+```bash
+# Requires Python 3.6+
+python3 rekordbox_playlist_copier.py
+```
 
 ---
 
@@ -70,15 +79,21 @@ If someone sent you a MekaBox playlist:
 
 ## Command Line Usage
 
-For advanced users, MekaBox includes a Python CLI script.
+MekaBox includes a Python CLI script that works on **Windows, Mac, and Linux**.
 
 ### Requirements
-- Python 3.6+
+- Python 3.6+ ([Download Python](https://www.python.org/downloads/))
 
 ### Running the CLI
 
+**Mac/Linux:**
 ```bash
 python3 rekordbox_playlist_copier.py
+```
+
+**Windows:**
+```bash
+python rekordbox_playlist_copier.py
 ```
 
 The script will interactively ask for:
@@ -125,8 +140,8 @@ PlaylistName/
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/mekabox.git
-cd mekabox
+git clone https://github.com/jaredb650/MekaBox.git
+cd MekaBox
 
 # Run the build script
 chmod +x build.sh

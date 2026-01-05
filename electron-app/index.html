@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+    <title>MekaBox</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Outer cyberpunk frame -->
+    <div class="cyber-frame">
+        <!-- Futuristic frame image overlay -->
+        <img src="assets/images/futuristicFrame.png" alt="" class="frame-image-overlay">
+
+        <!-- Window controls - positioned on top of frame corners -->
+        <button class="window-btn window-btn-minimize" title="Minimize">
+            <img src="assets/icons/minimizeButton.png" alt="Minimize" class="window-btn-img">
+        </button>
+        <button class="window-btn window-btn-close" title="Close">
+            <img src="assets/icons/closeButton.png" alt="Close" class="window-btn-img">
+        </button>
+
+        <!-- Header bar with logo container -->
+        <div class="frame-header">
+            <div class="logo-container">
+                <img src="assets/icons/mekaBoxLogoContainer.png" alt="" class="logo-container-bg">
+                <img src="assets/logos/mekabox-logo.png" alt="MEKABOX" class="frame-logo-img">
+            </div>
+        </div>
+
+        <!-- Background texture - covers entire frame -->
+        <img src="assets/logos/bgTexture1.png" alt="" class="bg-texture">
+
+        <!-- Inner content panel -->
+        <div class="frame-content">
+            <div class="app-container">
+                <!-- Screen 1: Welcome -->
+                <div id="screen-welcome" class="screen active">
+                    <div class="content-center">
+                        <div class="welcome-logo-container">
+                            <img src="assets/icons/mekaBoxLogoContainer.png" alt="" class="welcome-container-bg">
+                            <img src="assets/logos/mekabox-logo.png" alt="MEKABOX" class="welcome-logo-img">
+                        </div>
+                        <p class="tagline">Share Rekordbox playlists with<br>all your cues and beat grids</p>
+                        <div class="button-row">
+                            <button class="btn btn-secondary" id="btn-tutorial">Open Tutorial</button>
+                            <button class="btn btn-primary" id="btn-proceed">Proceed</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Screen 2: Import XML -->
+                <div id="screen-import" class="screen">
+                    <div class="screen-header with-back">
+                        <button class="btn-back" id="btn-back-import">
+                            <span class="back-icon">&#8592;</span> Back
+                        </button>
+                        <h2 class="screen-title">IMPORT XML</h2>
+                        <div class="header-spacer"></div>
+                    </div>
+                    <div class="content-center">
+                        <div class="drop-zone" id="drop-zone">
+                            <div class="drop-zone-content">
+                                <div class="drop-icon">&#128194;</div>
+                                <p>Drag & drop your Rekordbox XML here</p>
+                                <p class="subtle">or click to browse</p>
+                            </div>
+                        </div>
+                        <div class="last-used" id="last-used-section" style="display: none;">
+                            <span>Last used: <span id="last-used-path"></span></span>
+                            <button class="btn-text" id="btn-clear-last">Clear</button>
+                            <button class="btn-text" id="btn-use-last">Use</button>
+                        </div>
+                        <div class="selected-file" id="selected-file-section" style="display: none;">
+                            <span>Selected: <span id="selected-file-path"></span></span>
+                        </div>
+                        <p class="tutorial-link">
+                            Need to export your collection first?
+                            <button class="btn-text" id="btn-view-tutorial">View Tutorial</button>
+                        </p>
+                        <button class="btn btn-primary btn-continue" id="btn-continue-import" disabled>Continue</button>
+                    </div>
+                </div>
+
+                <!-- Screen 3: Select Playlist -->
+                <div id="screen-playlist" class="screen">
+                    <div class="screen-header with-back">
+                        <button class="btn-back" id="btn-back-playlist">
+                            <span class="back-icon">&#8592;</span> Back
+                        </button>
+                        <h2 class="screen-title">SELECT PLAYLIST</h2>
+                        <div class="header-spacer"></div>
+                    </div>
+                    <div class="content">
+                        <p class="playlist-count" id="playlist-count">Found 0 playlists</p>
+                        <div class="inner-panel">
+                            <div class="playlist-list" id="playlist-list">
+                                <!-- Playlists will be inserted here -->
+                            </div>
+                        </div>
+                        <div class="search-box">
+                            <span class="search-icon">&#9660;</span>
+                            <input type="text" id="playlist-search" placeholder="[Search playlists...]">
+                        </div>
+                        <button class="btn btn-primary btn-continue" id="btn-continue-playlist" disabled>Continue</button>
+                    </div>
+                </div>
+
+                <!-- Screen 4: Export Options -->
+                <div id="screen-options" class="screen">
+                    <div class="screen-header with-back">
+                        <button class="btn-back" id="btn-back-options">
+                            <span class="back-icon">&#8592;</span> Back
+                        </button>
+                        <h2 class="screen-title">EXPORT OPTIONS</h2>
+                        <div class="header-spacer"></div>
+                    </div>
+                    <div class="content">
+                        <p class="selected-playlist" id="selected-playlist-info">Playlist: (none selected)</p>
+
+                        <div class="option-group">
+                            <label class="option-card">
+                                <input type="radio" name="export-mode" value="copy_only">
+                                <div class="option-indicator"></div>
+                                <div class="option-content">
+                                    <span class="option-title">Copy tracks only</span>
+                                    <span class="option-desc">Just copies the audio files</span>
+                                </div>
+                            </label>
+                            <label class="option-card selected">
+                                <input type="radio" name="export-mode" value="full" checked>
+                                <div class="option-indicator"></div>
+                                <div class="option-content">
+                                    <span class="option-title">Copy tracks + Generate XML</span>
+                                    <span class="option-desc">Creates a shareable package with all metadata</span>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div class="output-section">
+                            <label>Save to:</label>
+                            <div class="output-row">
+                                <input type="text" id="output-folder" readonly placeholder="Select output folder...">
+                                <button class="btn btn-secondary" id="btn-browse-output">Browse</button>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary btn-export" id="btn-export">Export</button>
+                    </div>
+                </div>
+
+                <!-- Screen 5: Progress -->
+                <div id="screen-progress" class="screen">
+                    <div class="content-center">
+                        <h2 class="screen-title">EXPORTING...</h2>
+                        <p class="progress-playlist" id="progress-playlist-name">Playlist: (none)</p>
+
+                        <div class="progress-container">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill"></div>
+                            </div>
+                            <span class="progress-percent" id="progress-percent">0%</span>
+                        </div>
+
+                        <p class="progress-status" id="progress-status">Preparing...</p>
+                        <p class="progress-current" id="progress-current"></p>
+
+                        <button class="btn btn-secondary" id="btn-cancel">Cancel</button>
+                    </div>
+                </div>
+
+                <!-- Screen 6: Complete -->
+                <div id="screen-complete" class="screen">
+                    <div class="content-center">
+                        <div class="complete-icon" id="complete-icon">&#10003;</div>
+                        <h2 class="screen-title" id="complete-title">COMPLETE</h2>
+                        <p class="complete-playlist" id="complete-playlist-name">Successfully exported: (playlist)</p>
+
+                        <div class="stats">
+                            <div class="stat">
+                                <span class="stat-value" id="stat-success">0</span>
+                                <span class="stat-label">tracks copied</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-value" id="stat-failed">0</span>
+                                <span class="stat-label">failed</span>
+                            </div>
+                        </div>
+
+                        <p class="saved-to">Saved to:</p>
+                        <p class="output-path" id="output-path"></p>
+
+                        <div class="failed-section" id="failed-section" style="display: none;">
+                            <button class="btn-text" id="btn-show-failed">Show failed tracks &#9660;</button>
+                            <div class="failed-list" id="failed-list" style="display: none;"></div>
+                        </div>
+
+                        <div class="button-row">
+                            <button class="btn btn-secondary" id="btn-open-folder">Open Folder</button>
+                            <button class="btn btn-primary" id="btn-export-another">Export Another</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tutorial Modal -->
+                <div id="modal-tutorial" class="modal">
+                    <div class="modal-content cyber-modal">
+                        <div class="modal-header">
+                            <h2>HOW MEKABOX WORKS</h2>
+                            <button class="btn-close" id="btn-close-tutorial">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="tutorial-step">
+                                <h3>STEP 1: EXPORT YOUR REKORDBOX COLLECTION</h3>
+                                <p>Before using MekaBox, export your collection:</p>
+                                <ol>
+                                    <li>Open Rekordbox</li>
+                                    <li>Go to File > Export Collection in XML format</li>
+                                    <li>Save it somewhere you can find it</li>
+                                </ol>
+                            </div>
+
+                            <div class="tutorial-step">
+                                <h3>STEP 2: SELECT A PLAYLIST</h3>
+                                <p>MekaBox shows all playlists in your XML. Pick the one you want to export.</p>
+                            </div>
+
+                            <div class="tutorial-step">
+                                <h3>STEP 3: CHOOSE EXPORT MODE</h3>
+                                <ul>
+                                    <li><strong>Copy tracks only</strong> - Just the audio files</li>
+                                    <li><strong>Copy tracks + XML</strong> - Shareable package with all hot cues, beat grids, metadata preserved</li>
+                                </ul>
+                            </div>
+
+                            <div class="tutorial-step">
+                                <h3>STEP 4: YOUR PLAYLIST IS READY</h3>
+                                <p>MekaBox auto-prepares your XML. Import directly:</p>
+                                <ul>
+                                    <li>Preferences > Advanced > Database</li>
+                                    <li>Under "rekordbox xml", Browse for your XML</li>
+                                    <li>Right-click playlist > Import To Collection</li>
+                                </ul>
+                            </div>
+
+                            <div class="tutorial-step">
+                                <h3>STEP 5: SHARING WITH A FRIEND</h3>
+                                <ol>
+                                    <li>Zip the exported folder</li>
+                                    <li>Send to your friend</li>
+                                    <li>They'll find README.txt with instructions</li>
+                                </ol>
+                            </div>
+
+                            <div class="warning-box">
+                                <h4>&#9888; IMPORTANT FOR RECIPIENTS</h4>
+                                <p>If you received a MekaBox playlist, you MUST run the Setup script first:</p>
+                                <ul>
+                                    <li>Mac: "Setup (Mac).command"</li>
+                                    <li>Windows: "Setup (Windows).bat"</li>
+                                </ul>
+                                <p>This prepares the XML for YOUR computer. Then import into Rekordbox normally.</p>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-primary" id="btn-tutorial-proceed">Got it, let's go</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>

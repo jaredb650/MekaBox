@@ -1,0 +1,29 @@
+# Personal files
+CLAUDE.md
+rekordboxXMLlibraru.xml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Electron
+electron-app/node_modules/
+electron-app/dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp

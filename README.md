@@ -1,4 +1,8 @@
 <p align="center">
+  <img src="electron-app/assets/logos/ezgif-5b4204f5ba138b64.gif" alt="MekaBox Animation" width="400">
+</p>
+
+<p align="center">
   <img src="electron-app/assets/logos/mekabox-logo.png" alt="MekaBox" width="400">
 </p>
 

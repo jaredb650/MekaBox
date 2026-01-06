@@ -56,6 +56,44 @@ function hideModal() {
 }
 
 // ============================================================================
+// Splash Screen
+// ============================================================================
+
+function initSplashScreen() {
+    const splash = document.getElementById('splash-screen');
+    const video = document.getElementById('splash-video');
+    const cyberFrame = document.querySelector('.cyber-frame');
+
+    if (!splash || !video) return;
+
+    // Hide buttons and logo during splash
+    cyberFrame.classList.add('splash-active');
+
+    // Play the video
+    video.play().catch(err => {
+        // If video fails to play, just skip the splash
+        console.log('Splash video failed to play:', err);
+        splash.classList.add('hidden');
+        cyberFrame.classList.remove('splash-active');
+    });
+
+    // When video ends, freeze on last frame then glow out
+    video.addEventListener('ended', () => {
+        // Pause on last frame (it's already paused at end)
+        // Wait a brief moment, then glow out
+        setTimeout(() => {
+            splash.classList.add('glow-out');
+            // Show buttons and logo as splash fades
+            cyberFrame.classList.remove('splash-active');
+            // Remove from DOM after glow completes
+            setTimeout(() => {
+                splash.classList.add('hidden');
+            }, 600);
+        }, 300);
+    });
+}
+
+// ============================================================================
 // Initialization
 // ============================================================================
 
@@ -463,4 +501,5 @@ function escapeHtml(text) {
 // Initialize
 // ============================================================================
 
+initSplashScreen();
 init();

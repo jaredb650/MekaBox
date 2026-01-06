@@ -1310,3 +1310,55 @@ body {
 .frame-glow-tr { animation-delay: 0.5s; }
 .frame-glow-bl { animation-delay: 1s; }
 .frame-glow-br { animation-delay: 1.5s; }
+
+/* ============================================================================
+   Splash Screen - Intro Animation (inside frame)
+   ============================================================================ */
+
+.splash-screen {
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.6s ease-out, filter 0.6s ease-out;
+}
+
+.splash-screen.glow-out {
+    filter: brightness(3) blur(8px);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.splash-screen.hidden {
+    display: none;
+}
+
+.splash-screen video {
+    max-width: 90%;
+    max-height: 90%;
+    object-fit: contain;
+    transition: filter 0.6s ease-out;
+}
+
+.splash-screen.glow-out video {
+    filter: brightness(5) blur(4px);
+}
+
+/* Hide UI elements during splash */
+.splash-active .window-btn,
+.splash-active .frame-header,
+.splash-active .app-container {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease-out;
+}
+
+/* Show UI elements after splash */
+.window-btn,
+.frame-header,
+.app-container {
+    transition: opacity 0.4s ease-out;
+}

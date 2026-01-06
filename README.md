@@ -200,6 +200,12 @@ The built app will be in `electron-app/dist/`.
 
 ---
 
+## Created By
+
+**[MEKA](https://soundcloud.com/mekapr)** — Music producer and DJ
+
+---
+
 ## License
 
 MIT

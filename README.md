@@ -1,8 +1,8 @@
 # MekaBox
 
-**Share Rekordbox playlists with all your cues and beat grids preserved!**
+**Share Rekordbox playlists with all your cues and metadata preserved!**
 
-MekaBox exports Rekordbox playlists as shareable packages that include all your hot cues, cue points, beat grids, and metadata.
+MekaBox exports Rekordbox playlists as shareable packages that include all your hot cues and Rekordbox metadata.
 
 ---
 
@@ -18,7 +18,7 @@ Rekordbox doesn't have a built-in way to share playlists with all your prep work
 
 - All audio files are copied to a single folder
 - A custom XML is generated with relative paths that work anywhere
-- All your hot cues, memory cues, beat grids, BPM, key, and metadata are preserved
+- All your hot cues, memory cues, BPM, key, and other metadata are preserved
 - Setup scripts automatically configure the paths for the recipient's computer
 
 Now you can zip up the folder, upload it to Google Drive/Dropbox/WeTransfer, send it to a friend, download it on a different computer, or back up your sets to the cloud—and everything just works when you import it back into Rekordbox.

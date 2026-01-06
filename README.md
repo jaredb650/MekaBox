@@ -1,6 +1,10 @@
-# MekaBox
+<p align="center">
+  <img src="electron-app/assets/logos/mekabox-logo.png" alt="MekaBox" width="400">
+</p>
 
-**Share Rekordbox playlists with all your cues and metadata preserved!**
+<p align="center">
+  <strong>Share Rekordbox playlists with all your cues and metadata preserved!</strong>
+</p>
 
 MekaBox exports Rekordbox playlists as shareable packages that include all your hot cues and Rekordbox metadata.
 

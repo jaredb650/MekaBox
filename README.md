@@ -6,6 +6,25 @@ MekaBox exports Rekordbox playlists as shareable packages that include all your 
 
 ---
 
+## Why MekaBox?
+
+Rekordbox doesn't have a built-in way to share playlists with all your prep work intact. Here's the problem:
+
+- **If you just send the playlist file** → Your friend gets the metadata, but none of the actual audio files
+- **If you just send the audio files** → Your friend gets the tracks, but loses all your cue points, beat grids, and the playlist order
+- **If you export XML + copy files manually** → The XML still points to file paths on YOUR computer, so it won't work on theirs
+
+**MekaBox solves this** by creating a self-contained, portable playlist package:
+
+- All audio files are copied to a single folder
+- A custom XML is generated with relative paths that work anywhere
+- All your hot cues, memory cues, beat grids, BPM, key, and metadata are preserved
+- Setup scripts automatically configure the paths for the recipient's computer
+
+Now you can zip up the folder, upload it to Google Drive/Dropbox/WeTransfer, send it to a friend, download it on a different computer, or back up your sets to the cloud—and everything just works when you import it back into Rekordbox.
+
+---
+
 ## Download
 
 ### Mac (Apple Silicon)
@@ -15,9 +34,13 @@ Download the latest release from the [Releases page](../../releases):
 **Installation:**
 1. Download the DMG file
 2. Open it and drag MekaBox to your Applications folder
-3. Double-click to run
+3. **Important:** Before opening the app, run this command in Terminal:
+   ```bash
+   xattr -cr /Applications/MekaBox.app
+   ```
+4. Double-click to run
 
-> **Note:** On first launch, you may need to right-click > Open to bypass Gatekeeper.
+> **Why?** Since MekaBox isn't signed with an Apple Developer certificate, macOS will say "This app is damaged" when you try to open it. The command above removes the quarantine flag and allows it to run.
 
 ### Windows / Linux / Intel Mac
 Use the Python CLI (see [Command Line Usage](#command-line-usage) below).
@@ -162,8 +185,10 @@ The built app will be in `electron-app/dist/`.
 - Use the exact name shown, including `ROOT/` prefix if present
 - Names are case-sensitive
 
-### App won't open on Mac
-- Right-click the app > Open (bypasses Gatekeeper on first launch)
+### "App is damaged" or app won't open on Mac
+- Open Terminal and run: `xattr -cr /Applications/MekaBox.app`
+- This removes the quarantine flag that macOS adds to downloaded apps
+- The app isn't actually damaged—it's just not signed with an Apple Developer certificate
 
 ### Recipient can't import the XML
 - Make sure they ran the Setup script first

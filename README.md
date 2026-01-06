@@ -8,6 +8,8 @@
 
 MekaBox exports Rekordbox playlists as shareable packages that include all your hot cues and Rekordbox metadata.
 
+**[Watch the Tutorial](https://www.youtube.com/watch?v=EN_TL6_EPSw)** — Backup & Share Your Rekordbox Sets (All Files + XML Metadata)
+
 ---
 
 ## Why MekaBox?

@@ -291,64 +291,36 @@ cd "$(dirname "$0")"
 CURRENT_DIR=$(pwd)
 XML_FILE="{xml_filename}"
 BACKUP_FILE="{xml_filename}.backup"
+TRACKS_FOLDER="{tracks_folder_name}"
 
 echo "======================================"
 echo "Rekordbox Playlist Setup"
 echo "======================================"
 echo ""
-echo "Location: $CURRENT_DIR"
+echo "Current location: $CURRENT_DIR"
+echo "XML file: $XML_FILE"
+echo "Tracks folder: $TRACKS_FOLDER"
 echo ""
 
 # --------------------------------------
 # Step 1: Validate XML file exists
 # --------------------------------------
+echo "[1/5] Checking XML file exists..."
 if [ ! -f "$XML_FILE" ]; then
-    echo "ERROR: XML file not found: $XML_FILE"
+    echo "  ERROR: XML file not found: $XML_FILE"
     echo ""
-    echo "Make sure you're running this script from the playlist folder."
-    echo ""
-    read -p "Press Enter to close..."
-    exit 1
-fi
-
-# --------------------------------------
-# Step 2: Check if already configured
-# --------------------------------------
-if ! grep -q "PLACEHOLDER_ROOT" "$XML_FILE"; then
-    # Check if it has the current path (already set up for this location)
-    if grep -q "$CURRENT_DIR" "$XML_FILE"; then
-        echo "This playlist is already set up for this location!"
-        echo ""
-        echo "You can import it directly into Rekordbox."
-    else
-        echo "WARNING: This playlist was already configured for a different location."
-        echo ""
-        echo "If tracks aren't loading in Rekordbox, you may need a fresh copy"
-        echo "of this playlist folder from the original source."
-    fi
-    echo ""
-    echo "======================================"
-    read -p "Press Enter to close..."
-    exit 0
-fi
-
-# --------------------------------------
-# Step 3: Create backup before modifying
-# --------------------------------------
-echo "Creating backup..."
-cp "$XML_FILE" "$BACKUP_FILE"
-if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to create backup. Check disk space and permissions."
+    echo "  Make sure you're running this script from the playlist folder."
     echo ""
     read -p "Press Enter to close..."
     exit 1
 fi
+echo "  Found: $XML_FILE"
 
 # --------------------------------------
-# Step 4: URL-encode the path
-# Pure bash encoding - no Python required!
+# Step 2: URL-encode the current path
 # --------------------------------------
-echo "Encoding path..."
+echo ""
+echo "[2/5] Encoding current path for Rekordbox..."
 ENCODED_DIR=""
 for (( i=0; i<${{#CURRENT_DIR}}; i++ )); do
     char="${{CURRENT_DIR:$i:1}}"
@@ -360,34 +332,104 @@ for (( i=0; i<${{#CURRENT_DIR}}; i++ )); do
             ENCODED_DIR+="%20"
             ;;
         *)
-            # Encode other special characters
             ENCODED_DIR+=$(printf '%%%02X' "'$char")
             ;;
     esac
 done
 
-# Validate encoding worked
 if [ -z "$ENCODED_DIR" ]; then
-    echo "ERROR: Failed to encode directory path."
+    echo "  ERROR: Failed to encode directory path."
     echo ""
-    rm -f "$BACKUP_FILE"
     read -p "Press Enter to close..."
     exit 1
 fi
+echo "  Encoded path: $ENCODED_DIR"
 
 # --------------------------------------
-# Step 5: Replace placeholder in XML
+# Step 3: Analyze current XML state
 # --------------------------------------
-echo "Updating XML file..."
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    sed -i '' "s|PLACEHOLDER_ROOT|$ENCODED_DIR|g" "$XML_FILE"
+echo ""
+echo "[3/5] Analyzing XML file..."
+
+# Check if already configured for THIS location
+if grep -q "$ENCODED_DIR/$TRACKS_FOLDER" "$XML_FILE"; then
+    echo "  Current path in XML: $ENCODED_DIR"
+    echo "  Target path: $ENCODED_DIR"
+    echo ""
+    echo "  STATUS: Paths already match - no changes needed!"
+    echo ""
+    echo "  This playlist is already set up for this location."
+    echo "  You can import it directly into Rekordbox."
+    echo ""
+    echo "======================================"
+    read -p "Press Enter to close..."
+    exit 0
+fi
+
+# Determine what's currently in the XML
+if grep -q "PLACEHOLDER_ROOT" "$XML_FILE"; then
+    OLD_PATH="PLACEHOLDER_ROOT"
+    echo "  Current path in XML: PLACEHOLDER_ROOT (fresh export, not yet configured)"
+    PATH_TYPE="placeholder"
 else
-    sed -i "s|PLACEHOLDER_ROOT|$ENCODED_DIR|g" "$XML_FILE"
+    OLD_PATH=$(grep -o 'file://localhost[^"]*/'$TRACKS_FOLDER'/' "$XML_FILE" | head -1 | sed "s|/$TRACKS_FOLDER/||" | sed "s|file://localhost||")
+    if [ -z "$OLD_PATH" ]; then
+        echo "  ERROR: Could not find any path pattern in XML."
+        echo "  The XML file may be corrupted or in an unexpected format."
+        echo ""
+        read -p "Press Enter to close..."
+        exit 1
+    fi
+    echo "  Current path in XML: $OLD_PATH"
+    PATH_TYPE="existing"
+fi
+echo "  Target path: $ENCODED_DIR"
+
+# --------------------------------------
+# Step 4: Create backup
+# --------------------------------------
+echo ""
+echo "[4/5] Creating backup..."
+cp "$XML_FILE" "$BACKUP_FILE"
+if [ $? -ne 0 ]; then
+    echo "  ERROR: Failed to create backup. Check disk space and permissions."
+    echo ""
+    read -p "Press Enter to close..."
+    exit 1
+fi
+echo "  Backup created: $BACKUP_FILE"
+
+# --------------------------------------
+# Step 5: Update XML paths
+# --------------------------------------
+echo ""
+echo "[5/5] Updating XML paths..."
+
+if [ "$PATH_TYPE" = "placeholder" ]; then
+    echo "  Replacing PLACEHOLDER_ROOT with actual path..."
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "s|PLACEHOLDER_ROOT|$ENCODED_DIR|g" "$XML_FILE"
+    else
+        sed -i "s|PLACEHOLDER_ROOT|$ENCODED_DIR|g" "$XML_FILE"
+    fi
+else
+    echo "  Replacing old path with new path..."
+    # Escape special characters for sed
+    # Pattern needs: . escaped (regex special), & escaped, | escaped (our delimiter)
+    # Replacement needs: & escaped (means "matched text" in sed)
+    ESCAPED_OLD_PATH=$(printf '%s' "$OLD_PATH" | sed -e 's/[.&|]/\\\\&/g')
+    ESCAPED_NEW_PATH=$(printf '%s' "$ENCODED_DIR" | sed -e 's/[&]/\\\\&/g')
+    ESCAPED_TRACKS_FOLDER=$(printf '%s' "$TRACKS_FOLDER" | sed -e 's/[.&|]/\\\\&/g')
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "s|file://localhost$ESCAPED_OLD_PATH/$ESCAPED_TRACKS_FOLDER/|file://localhost$ESCAPED_NEW_PATH/$TRACKS_FOLDER/|g" "$XML_FILE"
+    else
+        sed -i "s|file://localhost$ESCAPED_OLD_PATH/$ESCAPED_TRACKS_FOLDER/|file://localhost$ESCAPED_NEW_PATH/$TRACKS_FOLDER/|g" "$XML_FILE"
+    fi
 fi
 
 if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to update XML file."
-    echo "Restoring from backup..."
+    echo "  ERROR: sed command failed."
+    echo "  Restoring from backup..."
     mv "$BACKUP_FILE" "$XML_FILE"
     echo ""
     read -p "Press Enter to close..."
@@ -395,35 +437,44 @@ if [ $? -ne 0 ]; then
 fi
 
 # --------------------------------------
-# Step 6: Verify the replacement worked
+# Verify the replacement worked
 # --------------------------------------
-echo "Verifying..."
+echo ""
+echo "Verifying changes..."
 
-# Check that PLACEHOLDER_ROOT is gone
 if grep -q "PLACEHOLDER_ROOT" "$XML_FILE"; then
-    echo "ERROR: XML file still contains placeholders after update."
-    echo "Restoring from backup..."
+    echo "  ERROR: XML still contains PLACEHOLDER_ROOT after update."
+    echo "  Restoring from backup..."
     mv "$BACKUP_FILE" "$XML_FILE"
     echo ""
     read -p "Press Enter to close..."
     exit 1
 fi
 
-# Check that our path is now in the file
-if ! grep -q "$ENCODED_DIR" "$XML_FILE"; then
-    echo "ERROR: XML file doesn't contain the expected path after update."
-    echo "Restoring from backup..."
+if ! grep -q "$ENCODED_DIR/$TRACKS_FOLDER" "$XML_FILE"; then
+    echo "  ERROR: XML doesn't contain the new path after update."
+    echo "  Restoring from backup..."
     mv "$BACKUP_FILE" "$XML_FILE"
     echo ""
     read -p "Press Enter to close..."
     exit 1
 fi
 
-# Success! Remove backup
+# Count how many paths were updated
+PATH_COUNT=$(grep -c "$ENCODED_DIR/$TRACKS_FOLDER" "$XML_FILE" || echo "0")
+
 rm -f "$BACKUP_FILE"
 
 echo ""
-echo "SUCCESS! Playlist is ready for import."
+echo "======================================"
+echo "SUCCESS!"
+echo "======================================"
+echo ""
+echo "Changed XML paths:"
+echo "  FROM: $OLD_PATH"
+echo "  TO:   $ENCODED_DIR"
+echo ""
+echo "Updated $PATH_COUNT track path(s) in $XML_FILE"
 echo ""
 echo "======================================"
 echo "Next steps:"
@@ -462,66 +513,118 @@ powershell -ExecutionPolicy Bypass -Command ^
 $ErrorActionPreference = 'Stop'; ^
 $xmlFile = '{xml_filename}'; ^
 $backupFile = '{xml_filename}.backup'; ^
+$tracksFolder = '{tracks_folder_name}'; ^
 $currentDir = (Get-Location).Path; ^
 ^
 Write-Host '======================================'; ^
 Write-Host 'Rekordbox Playlist Setup'; ^
 Write-Host '======================================'; ^
 Write-Host ''; ^
-Write-Host \"Location: $currentDir\"; ^
+Write-Host \"Current location: $currentDir\"; ^
+Write-Host \"XML file: $xmlFile\"; ^
+Write-Host \"Tracks folder: $tracksFolder\"; ^
 Write-Host ''; ^
 ^
 try {{ ^
+    Write-Host '[1/5] Checking XML file exists...'; ^
     if (-not (Test-Path $xmlFile)) {{ ^
-        throw \"ERROR: XML file not found: $xmlFile`n`nMake sure you're running this script from the playlist folder.\"; ^
+        throw \"  ERROR: XML file not found: $xmlFile`n`n  Make sure you're running this script from the playlist folder.\"; ^
     }} ^
+    Write-Host \"  Found: $xmlFile\"; ^
     ^
     $content = Get-Content $xmlFile -Raw; ^
     ^
-    if ($content -notmatch 'PLACEHOLDER_ROOT') {{ ^
-        if ($content -match [regex]::Escape($currentDir)) {{ ^
-            Write-Host 'This playlist is already set up for this location!'; ^
-            Write-Host ''; ^
-            Write-Host 'You can import it directly into Rekordbox.'; ^
-        }} else {{ ^
-            Write-Host 'WARNING: This playlist was already configured for a different location.'; ^
-            Write-Host ''; ^
-            Write-Host 'If tracks are not loading in Rekordbox, you may need a fresh copy'; ^
-            Write-Host 'of this playlist folder from the original source.'; ^
-        }} ^
+    Write-Host ''; ^
+    Write-Host '[2/5] Encoding current path for Rekordbox...'; ^
+    Add-Type -AssemblyName System.Web; ^
+    $encodedDir = [System.Web.HttpUtility]::UrlEncode($currentDir).Replace('%%2b', '+').Replace('%%2f', '/').Replace('%%5c', '/').Replace('%%3a', ':'); ^
+    $encodedDir = $encodedDir -replace '\\\\', '/'; ^
+    Write-Host \"  Encoded path: $encodedDir\"; ^
+    ^
+    $expectedPath = \"$encodedDir/$tracksFolder\"; ^
+    ^
+    Write-Host ''; ^
+    Write-Host '[3/5] Analyzing XML file...'; ^
+    ^
+    if ($content -match [regex]::Escape($expectedPath)) {{ ^
+        Write-Host \"  Current path in XML: $encodedDir\"; ^
+        Write-Host \"  Target path: $encodedDir\"; ^
+        Write-Host ''; ^
+        Write-Host '  STATUS: Paths already match - no changes needed!'; ^
+        Write-Host ''; ^
+        Write-Host '  This playlist is already set up for this location.'; ^
+        Write-Host '  You can import it directly into Rekordbox.'; ^
         Write-Host ''; ^
         Write-Host '======================================'; ^
         Read-Host 'Press Enter to close'; ^
         exit 0; ^
     }} ^
     ^
-    Write-Host 'Creating backup...'; ^
+    $oldPath = $null; ^
+    $pathType = $null; ^
+    ^
+    if ($content -match 'PLACEHOLDER_ROOT') {{ ^
+        $oldPath = 'PLACEHOLDER_ROOT'; ^
+        $pathType = 'placeholder'; ^
+        Write-Host '  Current path in XML: PLACEHOLDER_ROOT (fresh export, not yet configured)'; ^
+    }} else {{ ^
+        $pattern = \"file://localhost([^`\"]*?)/$tracksFolder/\"; ^
+        $match = [regex]::Match($content, $pattern); ^
+        if (-not $match.Success) {{ ^
+            throw '  ERROR: Could not find any path pattern in XML.`n  The XML file may be corrupted or in an unexpected format.'; ^
+        }} ^
+        $oldPath = $match.Groups[1].Value; ^
+        $pathType = 'existing'; ^
+        Write-Host \"  Current path in XML: $oldPath\"; ^
+    }} ^
+    Write-Host \"  Target path: $encodedDir\"; ^
+    ^
+    Write-Host ''; ^
+    Write-Host '[4/5] Creating backup...'; ^
     Copy-Item $xmlFile $backupFile -Force; ^
+    Write-Host \"  Backup created: $backupFile\"; ^
     ^
-    Write-Host 'Encoding path...'; ^
-    Add-Type -AssemblyName System.Web; ^
-    $encodedDir = [System.Web.HttpUtility]::UrlEncode($currentDir).Replace('%%2b', '+').Replace('%%2f', '/').Replace('%%5c', '/').Replace('%%3a', ':'); ^
-    $encodedDir = $encodedDir -replace '\\\\', '/'; ^
+    Write-Host ''; ^
+    Write-Host '[5/5] Updating XML paths...'; ^
     ^
-    Write-Host 'Updating XML file...'; ^
-    $newContent = $content -replace 'PLACEHOLDER_ROOT', $encodedDir; ^
+    if ($pathType -eq 'placeholder') {{ ^
+        Write-Host '  Replacing PLACEHOLDER_ROOT with actual path...'; ^
+        $newContent = $content -replace 'PLACEHOLDER_ROOT', $encodedDir; ^
+    }} else {{ ^
+        Write-Host '  Replacing old path with new path...'; ^
+        $escapedOldPath = [regex]::Escape($oldPath); ^
+        $escapedTracksFolder = [regex]::Escape($tracksFolder); ^
+        $newContent = $content -replace \"file://localhost$escapedOldPath/$escapedTracksFolder/\", \"file://localhost$encodedDir/$tracksFolder/\"; ^
+    }} ^
+    ^
     Set-Content $xmlFile $newContent -NoNewline; ^
     ^
-    Write-Host 'Verifying...'; ^
+    Write-Host ''; ^
+    Write-Host 'Verifying changes...'; ^
     $verifyContent = Get-Content $xmlFile -Raw; ^
     ^
     if ($verifyContent -match 'PLACEHOLDER_ROOT') {{ ^
-        throw 'ERROR: XML file still contains placeholders after update.'; ^
+        throw '  ERROR: XML still contains PLACEHOLDER_ROOT after update.'; ^
     }} ^
     ^
-    if ($verifyContent -notmatch [regex]::Escape($encodedDir)) {{ ^
-        throw 'ERROR: XML file does not contain the expected path after update.'; ^
+    if ($verifyContent -notmatch [regex]::Escape($expectedPath)) {{ ^
+        throw '  ERROR: XML does not contain the new path after update.'; ^
     }} ^
+    ^
+    $pathCount = ([regex]::Matches($verifyContent, [regex]::Escape($expectedPath))).Count; ^
     ^
     Remove-Item $backupFile -Force -ErrorAction SilentlyContinue; ^
     ^
     Write-Host ''; ^
-    Write-Host 'SUCCESS! Playlist is ready for import.'; ^
+    Write-Host '======================================'; ^
+    Write-Host 'SUCCESS!'; ^
+    Write-Host '======================================'; ^
+    Write-Host ''; ^
+    Write-Host 'Changed XML paths:'; ^
+    Write-Host \"  FROM: $oldPath\"; ^
+    Write-Host \"  TO:   $encodedDir\"; ^
+    Write-Host ''; ^
+    Write-Host \"Updated $pathCount track path(s) in $xmlFile\"; ^
     Write-Host ''; ^
     Write-Host '======================================'; ^
     Write-Host 'Next steps:'; ^
@@ -579,12 +682,42 @@ QUICK START
    - Right-click the playlist > "Import To Collection"
 
 ----------------------------------------------
+MAC USERS: IF THE SCRIPT IS BLOCKED
+----------------------------------------------
+
+macOS Gatekeeper may block the setup script from running because it
+was downloaded from the internet. You have two options:
+
+OPTION 1: Use System Settings (GUI)
+   - Try to run the script (it will be blocked)
+   - Open System Settings > Privacy & Security
+   - Scroll down to find the blocked script message
+   - Click "Allow Anyway"
+   - Try running the script again
+
+OPTION 2: Use Terminal (Faster)
+   Open Terminal and run this command (replace the path with your actual path):
+
+   xattr -d com.apple.quarantine "/path/to/Setup (Mac).command"
+
+   For example, if the playlist is on your Desktop:
+
+   xattr -d com.apple.quarantine ~/Desktop/{playlist_name}/Setup\\ \\(Mac\\).command
+
+   Or navigate to the playlist folder and run:
+
+   cd ~/Desktop/{playlist_name}
+   xattr -d com.apple.quarantine "Setup (Mac).command"
+
+   This removes the "quarantine" flag that macOS adds to downloaded files.
+
+----------------------------------------------
 IMPORTANT NOTES
 ----------------------------------------------
 
 - You MUST run the Setup script BEFORE importing into Rekordbox
-- The Setup script only needs to be run once
-- If you move this folder, you'll need to re-run the Setup script
+- If you move this folder, re-run the Setup script to update paths
+- You can run the Setup script as many times as needed
 - All your friend's cue points and beat grids will be preserved!
 
 ----------------------------------------------

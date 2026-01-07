@@ -282,41 +282,157 @@ def generate_playlist_xml(track_elements, playlist_name, tracks_folder_name, out
 # =============================================================================
 
 def generate_mac_setup_script(output_path, xml_filename, tracks_folder_name):
-    """Generate a double-clickable Mac setup script."""
+    """Generate a double-clickable Mac setup script with robust error handling."""
     script_content = f'''#!/bin/bash
 # Rekordbox Playlist Setup Script
 # Double-click this file to prepare the playlist for import into Rekordbox.
 
 cd "$(dirname "$0")"
 CURRENT_DIR=$(pwd)
+XML_FILE="{xml_filename}"
+BACKUP_FILE="{xml_filename}.backup"
 
 echo "======================================"
 echo "Rekordbox Playlist Setup"
 echo "======================================"
 echo ""
-echo "Preparing playlist for import..."
 echo "Location: $CURRENT_DIR"
 echo ""
 
-# URL-encode spaces and special characters in the path
-ENCODED_DIR=$(python3 -c "import sys; from urllib.parse import quote; print(quote(sys.argv[1], safe='/'))" "$CURRENT_DIR")
-
-# Replace placeholder with actual path in XML
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS
-    sed -i '' "s|PLACEHOLDER_ROOT|$ENCODED_DIR|g" "{xml_filename}"
-else
-    # Linux
-    sed -i "s|PLACEHOLDER_ROOT|$ENCODED_DIR|g" "{xml_filename}"
+# --------------------------------------
+# Step 1: Validate XML file exists
+# --------------------------------------
+if [ ! -f "$XML_FILE" ]; then
+    echo "ERROR: XML file not found: $XML_FILE"
+    echo ""
+    echo "Make sure you're running this script from the playlist folder."
+    echo ""
+    read -p "Press Enter to close..."
+    exit 1
 fi
 
-echo "Done!"
+# --------------------------------------
+# Step 2: Check if already configured
+# --------------------------------------
+if ! grep -q "PLACEHOLDER_ROOT" "$XML_FILE"; then
+    # Check if it has the current path (already set up for this location)
+    if grep -q "$CURRENT_DIR" "$XML_FILE"; then
+        echo "This playlist is already set up for this location!"
+        echo ""
+        echo "You can import it directly into Rekordbox."
+    else
+        echo "WARNING: This playlist was already configured for a different location."
+        echo ""
+        echo "If tracks aren't loading in Rekordbox, you may need a fresh copy"
+        echo "of this playlist folder from the original source."
+    fi
+    echo ""
+    echo "======================================"
+    read -p "Press Enter to close..."
+    exit 0
+fi
+
+# --------------------------------------
+# Step 3: Create backup before modifying
+# --------------------------------------
+echo "Creating backup..."
+cp "$XML_FILE" "$BACKUP_FILE"
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to create backup. Check disk space and permissions."
+    echo ""
+    read -p "Press Enter to close..."
+    exit 1
+fi
+
+# --------------------------------------
+# Step 4: URL-encode the path
+# Pure bash encoding - no Python required!
+# --------------------------------------
+echo "Encoding path..."
+ENCODED_DIR=""
+for (( i=0; i<${{#CURRENT_DIR}}; i++ )); do
+    char="${{CURRENT_DIR:$i:1}}"
+    case "$char" in
+        [a-zA-Z0-9/_.-])
+            ENCODED_DIR+="$char"
+            ;;
+        ' ')
+            ENCODED_DIR+="%20"
+            ;;
+        *)
+            # Encode other special characters
+            ENCODED_DIR+=$(printf '%%%02X' "'$char")
+            ;;
+    esac
+done
+
+# Validate encoding worked
+if [ -z "$ENCODED_DIR" ]; then
+    echo "ERROR: Failed to encode directory path."
+    echo ""
+    rm -f "$BACKUP_FILE"
+    read -p "Press Enter to close..."
+    exit 1
+fi
+
+# --------------------------------------
+# Step 5: Replace placeholder in XML
+# --------------------------------------
+echo "Updating XML file..."
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    sed -i '' "s|PLACEHOLDER_ROOT|$ENCODED_DIR|g" "$XML_FILE"
+else
+    sed -i "s|PLACEHOLDER_ROOT|$ENCODED_DIR|g" "$XML_FILE"
+fi
+
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to update XML file."
+    echo "Restoring from backup..."
+    mv "$BACKUP_FILE" "$XML_FILE"
+    echo ""
+    read -p "Press Enter to close..."
+    exit 1
+fi
+
+# --------------------------------------
+# Step 6: Verify the replacement worked
+# --------------------------------------
+echo "Verifying..."
+
+# Check that PLACEHOLDER_ROOT is gone
+if grep -q "PLACEHOLDER_ROOT" "$XML_FILE"; then
+    echo "ERROR: XML file still contains placeholders after update."
+    echo "Restoring from backup..."
+    mv "$BACKUP_FILE" "$XML_FILE"
+    echo ""
+    read -p "Press Enter to close..."
+    exit 1
+fi
+
+# Check that our path is now in the file
+if ! grep -q "$ENCODED_DIR" "$XML_FILE"; then
+    echo "ERROR: XML file doesn't contain the expected path after update."
+    echo "Restoring from backup..."
+    mv "$BACKUP_FILE" "$XML_FILE"
+    echo ""
+    read -p "Press Enter to close..."
+    exit 1
+fi
+
+# Success! Remove backup
+rm -f "$BACKUP_FILE"
+
 echo ""
+echo "SUCCESS! Playlist is ready for import."
+echo ""
+echo "======================================"
 echo "Next steps:"
+echo "======================================"
+echo ""
 echo "1. Open Rekordbox"
 echo "2. Go to Preferences > Advanced > Database"
 echo "3. Under 'rekordbox xml', click Browse and select:"
-echo "   $CURRENT_DIR/{xml_filename}"
+echo "   $CURRENT_DIR/$XML_FILE"
 echo "4. The playlist will appear in your rekordbox xml section"
 echo "5. Right-click the playlist and select 'Import To Collection'"
 echo ""
@@ -332,40 +448,105 @@ read -p "Press Enter to close..."
 
 
 def generate_windows_setup_script(output_path, xml_filename, tracks_folder_name):
-    """Generate a double-clickable Windows setup script."""
+    """Generate a double-clickable Windows setup script with robust error handling."""
+    # Use PowerShell for the heavy lifting - it's built into Windows and handles
+    # URL encoding, file operations, and error handling much better than batch
     script_content = f'''@echo off
 REM Rekordbox Playlist Setup Script
 REM Double-click this file to prepare the playlist for import into Rekordbox.
 
-echo ======================================
-echo Rekordbox Playlist Setup
-echo ======================================
-echo.
-echo Preparing playlist for import...
-echo Location: %~dp0
-echo.
-
 cd /d "%~dp0"
 
-REM Get current directory and encode spaces as %20
-set "CURRENT_DIR=%cd%"
-set "ENCODED_DIR=%CURRENT_DIR: =%%20%"
-
-REM Replace placeholder with actual path in XML using PowerShell
-powershell -Command "(Get-Content '{xml_filename}') -replace 'PLACEHOLDER_ROOT', '%ENCODED_DIR%' | Set-Content '{xml_filename}'"
-
-echo Done!
-echo.
-echo Next steps:
-echo 1. Open Rekordbox
-echo 2. Go to Preferences ^> Advanced ^> Database
-echo 3. Under 'rekordbox xml', click Browse and select:
-echo    %cd%\\{xml_filename}
-echo 4. The playlist will appear in your rekordbox xml section
-echo 5. Right-click the playlist and select 'Import To Collection'
-echo.
-echo ======================================
-pause
+REM Run the setup logic in PowerShell (built into Windows, no extra install needed)
+powershell -ExecutionPolicy Bypass -Command ^
+$ErrorActionPreference = 'Stop'; ^
+$xmlFile = '{xml_filename}'; ^
+$backupFile = '{xml_filename}.backup'; ^
+$currentDir = (Get-Location).Path; ^
+^
+Write-Host '======================================'; ^
+Write-Host 'Rekordbox Playlist Setup'; ^
+Write-Host '======================================'; ^
+Write-Host ''; ^
+Write-Host \"Location: $currentDir\"; ^
+Write-Host ''; ^
+^
+try {{ ^
+    if (-not (Test-Path $xmlFile)) {{ ^
+        throw \"ERROR: XML file not found: $xmlFile`n`nMake sure you're running this script from the playlist folder.\"; ^
+    }} ^
+    ^
+    $content = Get-Content $xmlFile -Raw; ^
+    ^
+    if ($content -notmatch 'PLACEHOLDER_ROOT') {{ ^
+        if ($content -match [regex]::Escape($currentDir)) {{ ^
+            Write-Host 'This playlist is already set up for this location!'; ^
+            Write-Host ''; ^
+            Write-Host 'You can import it directly into Rekordbox.'; ^
+        }} else {{ ^
+            Write-Host 'WARNING: This playlist was already configured for a different location.'; ^
+            Write-Host ''; ^
+            Write-Host 'If tracks are not loading in Rekordbox, you may need a fresh copy'; ^
+            Write-Host 'of this playlist folder from the original source.'; ^
+        }} ^
+        Write-Host ''; ^
+        Write-Host '======================================'; ^
+        Read-Host 'Press Enter to close'; ^
+        exit 0; ^
+    }} ^
+    ^
+    Write-Host 'Creating backup...'; ^
+    Copy-Item $xmlFile $backupFile -Force; ^
+    ^
+    Write-Host 'Encoding path...'; ^
+    Add-Type -AssemblyName System.Web; ^
+    $encodedDir = [System.Web.HttpUtility]::UrlEncode($currentDir).Replace('%%2b', '+').Replace('%%2f', '/').Replace('%%5c', '/').Replace('%%3a', ':'); ^
+    $encodedDir = $encodedDir -replace '\\\\', '/'; ^
+    ^
+    Write-Host 'Updating XML file...'; ^
+    $newContent = $content -replace 'PLACEHOLDER_ROOT', $encodedDir; ^
+    Set-Content $xmlFile $newContent -NoNewline; ^
+    ^
+    Write-Host 'Verifying...'; ^
+    $verifyContent = Get-Content $xmlFile -Raw; ^
+    ^
+    if ($verifyContent -match 'PLACEHOLDER_ROOT') {{ ^
+        throw 'ERROR: XML file still contains placeholders after update.'; ^
+    }} ^
+    ^
+    if ($verifyContent -notmatch [regex]::Escape($encodedDir)) {{ ^
+        throw 'ERROR: XML file does not contain the expected path after update.'; ^
+    }} ^
+    ^
+    Remove-Item $backupFile -Force -ErrorAction SilentlyContinue; ^
+    ^
+    Write-Host ''; ^
+    Write-Host 'SUCCESS! Playlist is ready for import.'; ^
+    Write-Host ''; ^
+    Write-Host '======================================'; ^
+    Write-Host 'Next steps:'; ^
+    Write-Host '======================================'; ^
+    Write-Host ''; ^
+    Write-Host '1. Open Rekordbox'; ^
+    Write-Host '2. Go to Preferences ^> Advanced ^> Database'; ^
+    Write-Host \"3. Under 'rekordbox xml', click Browse and select:\"; ^
+    Write-Host \"   $currentDir\\$xmlFile\"; ^
+    Write-Host '4. The playlist will appear in your rekordbox xml section'; ^
+    Write-Host \"5. Right-click the playlist and select 'Import To Collection'\"; ^
+    Write-Host ''; ^
+    Write-Host '======================================'; ^
+^
+}} catch {{ ^
+    Write-Host ''; ^
+    Write-Host $_.Exception.Message -ForegroundColor Red; ^
+    Write-Host ''; ^
+    if (Test-Path $backupFile) {{ ^
+        Write-Host 'Restoring from backup...'; ^
+        Move-Item $backupFile $xmlFile -Force; ^
+    }} ^
+}} ^
+^
+Read-Host 'Press Enter to close'
 '''
 
     with open(output_path, 'w') as f:
